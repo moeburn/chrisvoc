@@ -10,12 +10,15 @@
 #include <SensirionI2cSht4x.h>
 #include <VOCGasIndexAlgorithm.h>
 
+#define bkl_pin 2
+#define ldr_pin 0
+
 SensirionI2cSht4x sht4x;
 SensirionI2CSgp41 sgp41;
 
 VOCGasIndexAlgorithm voc_algorithm;
 NOxGasIndexAlgorithm nox_algorithm;
-
+int ldr_read;
 // time in seconds needed for NOx conditioning
 uint16_t conditioning_s = 10;
 
@@ -51,7 +54,8 @@ void doDisplay(){
 
   img.setTextSize(1); // Font size 2 (16px)
   img.setCursor(24 * scalingFactor, 2 * scalingFactor); // Adjusted to fit top-left quadrant
-  img.print("Temp:");
+  img.println("Temp:");
+  img.print(ldr_read);
   img.setCursor(6 * scalingFactor, 40 * scalingFactor); // Centered vertically in quadrant
   img.setTextSize(2); // Font size 3 (24px)
   img.print(temperature, 1);
@@ -90,6 +94,8 @@ void doDisplay(){
 void setup() {
 
   Serial.begin(115200);
+  pinMode(bkl_pin, OUTPUT);
+  pinMode(ldr_pin, INPUT);
   tft.init();
   tft.setRotation(0);
   tft.fillScreen(TFT_BLACK);
@@ -171,6 +177,10 @@ void setup() {
 }
 
 void loop() {
+  every(250){
+    ldr_read = analogRead(ldr_pin);
+    analogWrite(bkl_pin, map(ldr_read, 0, 1024, 0, 255));
+  }
   every(1000){
 
     // 3. Measure SGP4x signals
