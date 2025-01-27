@@ -1,6 +1,7 @@
 #include <TFT_eSPI.h> 
 #include <SPI.h>
-
+#include <Adafruit_MPU6050.h>
+#include <Adafruit_Sensor.h>
 
 #include <Arduino.h>
 #include <Wire.h>
@@ -13,12 +14,19 @@
 #define bkl_pin 2
 #define ldr_pin 0
 
+#define button1 3
+#define button2 21
+#define button3 20
+#define button4 7
+#define button5 5
+
 SensirionI2cSht4x sht4x;
 SensirionI2CSgp41 sgp41;
-
+Adafruit_MPU6050 mpu;
 VOCGasIndexAlgorithm voc_algorithm;
 NOxGasIndexAlgorithm nox_algorithm;
 int ldr_read;
+int button;
 // time in seconds needed for NOx conditioning
 uint16_t conditioning_s = 10;
 
@@ -55,7 +63,8 @@ void doDisplay(){
   img.setTextSize(1); // Font size 2 (16px)
   img.setCursor(24 * scalingFactor, 2 * scalingFactor); // Adjusted to fit top-left quadrant
   img.println("Temp:");
-  img.print(ldr_read);
+  img.println(ldr_read);
+  img.print(button);
   img.setCursor(6 * scalingFactor, 40 * scalingFactor); // Centered vertically in quadrant
   img.setTextSize(2); // Font size 3 (24px)
   img.print(temperature, 1);
@@ -95,7 +104,14 @@ void setup() {
 
   Serial.begin(115200);
   pinMode(bkl_pin, OUTPUT);
+  digitalWrite(bkl_pin, HIGH);
   pinMode(ldr_pin, INPUT);
+  pinMode(button1, INPUT_PULLUP);
+  pinMode(button2, INPUT_PULLUP);
+  pinMode(button3, INPUT_PULLUP);
+  pinMode(button4, INPUT_PULLUP);
+  pinMode(button5, INPUT_PULLUP);
+
   tft.init();
   tft.setRotation(0);
   tft.fillScreen(TFT_BLACK);
@@ -174,12 +190,51 @@ void setup() {
         compensationT = static_cast<uint16_t>((tempSHT + 45) * 65535 / 175);
         compensationRh = static_cast<uint16_t>(humSHT * 65535 / 100);
     }
+  if (!mpu.begin()) {
+    Serial.println("Failed to find MPU6050 chip");
+  }
+  mpu.setAccelerometerRange(MPU6050_RANGE_2_G);
+  mpu.setFilterBandwidth(MPU6050_BAND_5_HZ);
+  Serial.println("MPU6050 ready!");
 }
 
 void loop() {
-  every(250){
+  int newldr;
+  sensors_event_t a, g, temp;
+  mpu.getEvent(&a, &g, &temp);
+
+  // Determine dominant axis
+  float x = a.acceleration.x;
+  float y = a.acceleration.y;
+
+
+  every(100){
     ldr_read = analogRead(ldr_pin);
-    analogWrite(bkl_pin, map(ldr_read, 0, 1024, 0, 255));
+    newldr = map(ldr_read, 0, 4096, 0, 255);
+    if (newldr < 1) {newldr=1;}
+    analogWrite(bkl_pin, newldr);
+    if (!digitalRead(button1)) {button = 1;}
+    if (!digitalRead(button2)) {button = 2;}
+    if (!digitalRead(button3)) {button = 3;}
+    if (!digitalRead(button4)) {button = 4;}
+    if (!digitalRead(button5)) {button = 5;}
+  if (abs(y) > abs(x)) {
+    if (y > 0) {
+      tft.setRotation(0); // Up
+      Serial.println("Orientation: UP");
+    } else {
+      tft.setRotation(2); // Down
+      Serial.println("Orientation: DOWN");
+    }
+  } else {
+    if (x > 0) {
+      tft.setRotation(1); // Right
+      Serial.println("Orientation: RIGHT");
+    } else {
+      tft.setRotation(3); // Left
+      Serial.println("Orientation: LEFT");
+    }
+  }
   }
   every(1000){
 
