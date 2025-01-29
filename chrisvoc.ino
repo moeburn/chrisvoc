@@ -11,6 +11,16 @@
 #include <SensirionI2cSht4x.h>
 #include <VOCGasIndexAlgorithm.h>
 
+#include <WiFi.h>
+#include <WiFiClient.h>
+#include <WebServer.h>
+#include <ElegantOTA.h>
+
+const char* ssid = "mikesnet";
+const char* password = "springchicken";
+
+WebServer server(80);
+
 #define bkl_pin 2
 #define ldr_pin 0
 
@@ -60,42 +70,50 @@ void doDisplay(){
   img.drawLine(0, 119, 240, 119, TFT_BLACK);  // Horizontal center line
   img.drawLine(0, 120, 240, 120, TFT_BLACK); // Horizontal center line (thicker)
 
-  img.setTextSize(1); // Font size 2 (16px)
+  img.setTextSize(2); // Font size 2 (16px)
   img.setCursor(24 * scalingFactor, 2 * scalingFactor); // Adjusted to fit top-left quadrant
   img.println("Temp:");
+  img.setTextSize(1);
   img.println(ldr_read);
   img.print(button);
   img.setCursor(6 * scalingFactor, 40 * scalingFactor); // Centered vertically in quadrant
-  img.setTextSize(2); // Font size 3 (24px)
+  img.setTextSize(3); // Font size 3 (24px)
   img.print(temperature, 1);
   img.print("c");
 
   // Quadrant 2: Top-right
-  img.setTextSize(1); // Font size 2 (16px)
+  img.setTextSize(2); // Font size 2 (16px)
   img.setCursor(124 * scalingFactor, 2 * scalingFactor); // Adjusted to fit top-right quadrant
   img.print("Hum:");
-  img.setCursor(130 * scalingFactor, 40 * scalingFactor); // Centered vertically in quadrant
-  img.setTextSize(2); // Font size 3 (24px)
-  img.print(humidity, 0);
+  img.setCursor(122 * scalingFactor, 40 * scalingFactor); // Centered vertically in quadrant
+  img.setTextSize(3); // Font size 3 (24px)
+  img.print(humidity, 1);
   img.print("%");
 
   // Quadrant 3: Bottom-left
-  img.setTextSize(1); // Font size 2 (16px)
+  img.setTextSize(2); // Font size 2 (16px)
   img.setCursor(24 * scalingFactor, 104 * scalingFactor); // Adjusted for bottom-left quadrant
-  img.print("VOC Index:");
+  img.print("VOC:");
   img.setCursor(20 * scalingFactor, 140 * scalingFactor); // Centered vertically in quadrant
-  img.setTextSize(2); // Font size 3 (24px)
+  img.setTextSize(3); // Font size 3 (24px)
   img.print(voc_index, 1);
 
 
   // Quadrant 4: Bottom-right
-  img.setTextSize(1); // Font size 2 (16px)
+  img.setTextSize(2); // Font size 2 (16px)
   img.setCursor(124 * scalingFactor, 104 * scalingFactor); // Adjusted for bottom-right quadrant
-  img.print("NOX Index:");
+  img.print("NOX:");
   img.setCursor(130 * scalingFactor, 140 * scalingFactor); // Centered vertically in quadrant
-  img.setTextSize(2); // Font size 3 (24px)
+  img.setTextSize(3); // Font size 3 (24px)
   img.print(nox_index, 0);
+
+  img.setTextSize(1);
+  img.setCursor(20 * scalingFactor, (140 * scalingFactor) + 28); // Centered vertically in quadrant
+  img.print(srawVoc, 0);
+  img.setCursor(130 * scalingFactor, (140 * scalingFactor) + 28); // Centered vertically in quadrant
+  img.print(srawNox, 0);
   img.pushSprite(0, 0);
+
 
 }
 
@@ -115,21 +133,41 @@ void setup() {
   tft.init();
   tft.setRotation(0);
   tft.fillScreen(TFT_BLACK);
+tft.drawRect(0,0, tft.width(), tft.height(), TFT_WHITE);
 
-
-  tft.setCursor(0,0);
-  tft.setTextColor(TFT_BLUE, TFT_BLACK);
+  tft.setCursor(5,5);
+  tft.setTextColor(TFT_WHITE, TFT_BLACK);
   tft.setTextDatum(TR_DATUM);
   tft.setTextWrap(true); // Wrap on width
   tft.setTextSize(1);
   tft.print("Loading...");  //display wifi connection progress
-  tft.drawRect(0,0, tft.width(), tft.height(), TFT_WHITE);
+  /*WiFi.mode(WIFI_STA);
+  WiFi.begin(ssid, password);
+  Serial.println("");
+
+  // Wait for connection
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    tft.print(".");
+        if (millis() > 20000) {
+            break;
+          }
+  }
+  tft.fillScreen(TFT_BLACK);
+  tft.setCursor(5,5);
+  tft.println("");
+  tft.print("Connected to ");
+  tft.println(ssid);
+  tft.print("IP address: ");
+  tft.println(WiFi.localIP());
+  tft.print("Signal strength: ");
+  tft.println(WiFi.RSSI());*/
     Wire.begin();
       img.createSprite(240, 240);
       img.fillSprite(TFT_BLACK);
     sht4x.begin(Wire, SHT40_I2C_ADDR_44);
     sgp41.begin(Wire);
-  delay(500);
+  //delay(500);
     int32_t index_offset;
     int32_t learning_time_offset_hours;
     int32_t learning_time_gain_hours;
@@ -196,19 +234,29 @@ void setup() {
   mpu.setAccelerometerRange(MPU6050_RANGE_2_G);
   mpu.setFilterBandwidth(MPU6050_BAND_5_HZ);
   Serial.println("MPU6050 ready!");
+  /*server.on("/", []() {
+    server.send(200, "text/plain", "Hi! This is ElegantOTA Demo.");
+  });
+
+  ElegantOTA.begin(&server);    // Start ElegantOTA
+  server.begin();*/
 }
 
 void loop() {
-  int newldr;
-  sensors_event_t a, g, temp;
-  mpu.getEvent(&a, &g, &temp);
+  //server.handleClient();
+  //ElegantOTA.loop();
 
-  // Determine dominant axis
-  float x = a.acceleration.x;
-  float y = a.acceleration.y;
+
 
 
   every(100){
+    sensors_event_t a, g, temp;
+    mpu.getEvent(&a, &g, &temp);
+
+    // Determine dominant axis
+    float x = a.acceleration.x;
+    float y = a.acceleration.y;
+    int newldr;
     ldr_read = analogRead(ldr_pin);
     newldr = map(ldr_read, 0, 4096, 0, 255);
     if (newldr < 1) {newldr=1;}
@@ -218,24 +266,25 @@ void loop() {
     if (!digitalRead(button3)) {button = 3;}
     if (!digitalRead(button4)) {button = 4;}
     if (!digitalRead(button5)) {button = 5;}
-  if (abs(y) > abs(x)) {
-    if (y > 0) {
-      tft.setRotation(0); // Up
-      Serial.println("Orientation: UP");
+    if (abs(y) > abs(x)) {
+      if (y > 0) {
+        tft.setRotation(3); // Up
+        Serial.println("Orientation: UP");
+      } else {
+        tft.setRotation(1); // Down
+        Serial.println("Orientation: DOWN");
+      }
     } else {
-      tft.setRotation(2); // Down
-      Serial.println("Orientation: DOWN");
-    }
-  } else {
-    if (x > 0) {
-      tft.setRotation(1); // Right
-      Serial.println("Orientation: RIGHT");
-    } else {
-      tft.setRotation(3); // Left
-      Serial.println("Orientation: LEFT");
+      if (x > 0) {
+        tft.setRotation(0); // Right
+        Serial.println("Orientation: RIGHT");
+      } else {
+        tft.setRotation(2); // Left
+        Serial.println("Orientation: LEFT");
+      }
     }
   }
-  }
+
   every(1000){
 
     // 3. Measure SGP4x signals
