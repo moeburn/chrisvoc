@@ -10,15 +10,20 @@
 #include <SensirionI2CSgp41.h>
 #include <SensirionI2cSht4x.h>
 #include <VOCGasIndexAlgorithm.h>
-
+#include <BlynkSimpleEsp32.h>
 #include <WiFi.h>
 #include <WiFiClient.h>
 #include <WebServer.h>
 #include <ElegantOTA.h>
+#include <ArduinoOTA.h>
+#include <Preferences.h>
 
+Preferences preferences;
+char auth[] = "eT_7FL7IUpqonthsAr-58uTK_-su_GYy"; //BLYNK
 const char* ssid = "mikesnet";
 const char* password = "springchicken";
-
+#include <WiFiManager.h>      
+WiFiManager wm;
 WebServer server(80);
 
 #define bkl_pin 2
@@ -30,12 +35,12 @@ WebServer server(80);
 #define button4 7
 #define button5 5
 #define maxArray 501
-
+bool editinterval, editcalib, editbright, editauto, menumode;
 float tempOffset = -0.7;
-
+      int newldr;
 int sampleSecs = 30 * 1000;
-int brightness = 10;
-
+int brightness = 20;
+bool autobright = true;
  float array1[maxArray];
  float array2[maxArray];
  float array3[maxArray];
@@ -51,6 +56,7 @@ NOxGasIndexAlgorithm nox_algorithm;
 int readingCount = 0; // Counter for the number of readings
 int ldr_read;
 int button = 5;
+int menusel = 1;
 // time in seconds needed for NOx conditioning
 uint16_t conditioning_s = 10;
 
@@ -91,7 +97,7 @@ void doMainDisplay(){
   img.println("Temp:");
   img.setTextSize(1);
   img.println(ldr_read);
-  img.print(button);
+  img.print(newldr);
   img.setCursor(6 * scalingFactor, 40 * scalingFactor); // Centered vertically in quadrant
   img.setTextSize(3); // Font size 3 (24px)
   img.print(tempSHT, 1);
@@ -131,6 +137,69 @@ void doMainDisplay(){
   img.pushSprite(0, 0);
 
 
+}
+
+
+void displayMenu(){
+
+  int fontsize = 16;
+  img.setTextSize(2);
+  img.fillScreen(TFT_BLACK);
+  img.setCursor(0, 0);
+  img.setTextColor(TFT_WHITE, TFT_BLACK);
+   if (WiFi.status() == WL_CONNECTED) {
+  img.print("Connected! to: ");
+  img.println(WiFi.localIP());
+  img.print("RSSI: ");
+  img.println(WiFi.RSSI());
+  img.println("");
+   }
+   else {img.setCursor(0, fontsize*3);}
+  if (menusel == 1) {img.setTextColor(TFT_BLACK, TFT_WHITE);} else {img.setTextColor(TFT_WHITE, TFT_BLACK);}
+  img.println("Start Wifi");
+  if (menusel == 2) {img.setTextColor(TFT_BLACK, TFT_WHITE);} else {img.setTextColor(TFT_WHITE, TFT_BLACK);}
+  img.println("Change Chart Interval");
+  if (menusel == 3) {img.setTextColor(TFT_BLACK, TFT_WHITE);} else {img.setTextColor(TFT_WHITE, TFT_BLACK);}
+  img.println("Set Temp Offset");
+  if (menusel == 4) {img.setTextColor(TFT_BLACK, TFT_WHITE);} else {img.setTextColor(TFT_WHITE, TFT_BLACK);}
+  img.println("Set Brightness");
+  if (menusel == 5) {img.setTextColor(TFT_BLACK, TFT_WHITE);} else {img.setTextColor(TFT_WHITE, TFT_BLACK);}
+  img.println("Auto Brightness");
+  if (menusel == 6) {img.setTextColor(TFT_BLACK, TFT_WHITE);} else {img.setTextColor(TFT_WHITE, TFT_BLACK);}
+  img.println("Cat");
+  if (menusel == 7) {img.setTextColor(TFT_BLACK, TFT_WHITE);} else {img.setTextColor(TFT_WHITE, TFT_BLACK);}
+  img.println("Exit");
+
+  img.setCursor(200, fontsize*4); 
+  if (editinterval) {img.setTextColor(TFT_BLACK, TFT_WHITE);} else {img.setTextColor(TFT_WHITE, TFT_BLACK);}
+  float sampleMins = sampleSecs / 60000;
+  img.print(sampleMins);
+  img.println(" mins");
+  img.setCursor(200, fontsize*5); 
+  if (editcalib) {img.setTextColor(TFT_BLACK, TFT_WHITE);} else {img.setTextColor(TFT_WHITE, TFT_BLACK);}
+  img.print(tempOffset);
+  img.println(" c");
+  img.setCursor(200, fontsize*6); 
+  if (editbright) {img.setTextColor(TFT_BLACK, TFT_WHITE);} else {img.setTextColor(TFT_WHITE, TFT_BLACK);}
+  img.print(brightness);
+  img.println(" (0-255)");
+  img.setCursor(200, fontsize*7); 
+  if (editauto) {img.setTextColor(TFT_BLACK, TFT_WHITE);} else {img.setTextColor(TFT_WHITE, TFT_BLACK);}
+  img.print(autobright);
+  //img.setCursor(200, fontsize*8); 
+  //if (wifireset) {img.println("Reset!");}
+  img.setCursor(0, 106); 
+  img.print("rawVOC: ");
+  img.print(srawVoc);
+  img.print(" | Raw Temp: ");
+  img.print(temperature);
+  img.print("c | Hum: ");
+  img.print(humidity);
+  img.print("%");
+  img.setCursor(0, 114); 
+  img.print("rawNOX: ");
+  img.print(srawNox);
+  img.pushSprite(0, 0);
 }
 
 void setupChart() {
@@ -341,7 +410,12 @@ void setup() {
   pinMode(button3, INPUT_PULLUP);
   pinMode(button4, INPUT_PULLUP);
   pinMode(button5, INPUT_PULLUP);
-
+  preferences.begin("my-app", false);
+  sampleSecs = preferences.getUInt("sampleSecs", 300);
+  tempOffset = preferences.getFloat("tempOffset", -0.7);
+  brightness = preferences.getUInt("brightness", 20);
+  autobright = preferences.getBool("autobright", true);
+  preferences.end();
   tft.init();
   tft.setRotation(0);
   tft.fillScreen(TFT_BLACK);
@@ -353,27 +427,51 @@ void setup() {
   tft.setTextWrap(true); // Wrap on width
   tft.setTextSize(1);
   tft.print("Loading...");  //display wifi connection progress
-  /*WiFi.mode(WIFI_STA);
-  WiFi.begin(ssid, password);
-  Serial.println("");
+  if (wm.getWiFiIsSaved()){
+    tft.fillScreen(TFT_BLACK);
+    tft.setCursor(5,5);
+    tft.print("Found wifi credentials, connecting...");  //display wifi connection progress
+      WiFi.mode(WIFI_STA);
+      WiFi.begin(wm.getWiFiSSID().c_str(), wm.getWiFiPass().c_str());
 
-  // Wait for connection
-  while (WiFi.status() != WL_CONNECTED) {
-    delay(500);
-    tft.print(".");
-        if (millis() > 20000) {
-            break;
-          }
+      // Wait for connection
+      while (WiFi.status() != WL_CONNECTED) {
+        delay(500);
+        tft.print(".");
+            if (millis() > 20000) {
+                  tft.fillScreen(TFT_RED);
+                  tft.setCursor(5,5);
+                  tft.print("Failed to connect to saved wifi, aborting.");  //display wifi connection progress
+                  delay(3000);
+                break;
+              }
+      }
+      if (WiFi.status() == WL_CONNECTED) {
+        tft.fillScreen(TFT_BLACK);
+        tft.setCursor(5,5);
+        tft.println("");
+        tft.print("Connected to ");
+        tft.println(ssid);
+        tft.print("IP address: ");
+        tft.println(WiFi.localIP());
+        tft.print("Signal strength: ");
+        tft.println(WiFi.RSSI());
+        Blynk.config(auth, IPAddress(216,110,224,105), 8080);
+        Blynk.connect();
+        while ((!Blynk.connected()) && (millis() < 20000)){
+            delay(500);
+        }
+        server.on("/", []() {
+          server.send(200, "text/plain", "Hi! This is Chris's VOC meter. Try /update instead.");
+        });
+
+        ElegantOTA.begin(&server);    // Start ElegantOTA
+        server.begin();
+        ArduinoOTA.setHostname("chrisvoc");
+        ArduinoOTA.begin();
+
+      }
   }
-  tft.fillScreen(TFT_BLACK);
-  tft.setCursor(5,5);
-  tft.println("");
-  tft.print("Connected to ");
-  tft.println(ssid);
-  tft.print("IP address: ");
-  tft.println(WiFi.localIP());
-  tft.print("Signal strength: ");
-  tft.println(WiFi.RSSI());*/
     Wire.begin();
       img.createSprite(240, 240);
       img.fillSprite(TFT_BLACK);
@@ -444,7 +542,7 @@ void setup() {
     Serial.println("Failed to find MPU6050 chip");
   }
   mpu.setAccelerometerRange(MPU6050_RANGE_2_G);
-  mpu.setFilterBandwidth(MPU6050_BAND_5_HZ);
+  mpu.setFilterBandwidth(MPU6050_BAND_10_HZ);
   Serial.println("MPU6050 ready!");
   /*server.on("/", []() {
     server.send(200, "text/plain", "Hi! This is ElegantOTA Demo.");
@@ -457,7 +555,11 @@ void setup() {
 void loop() {
   //server.handleClient();
   //ElegantOTA.loop();
-
+  if (WiFi.status() == WL_CONNECTED) {
+    ArduinoOTA.handle();
+    server.handleClient();
+    ElegantOTA.loop();
+  }
 
 
 
@@ -468,30 +570,167 @@ void loop() {
     // Determine dominant axis
     float x = a.acceleration.x;
     float y = a.acceleration.y;
-    int newldr;
-    ldr_read = analogRead(ldr_pin);
-    newldr = map(ldr_read, 0, 4096, 0, 255);
-    newldr = newldr + brightness;
-    if (newldr < 1) {newldr=1;}
-    if (newldr > 255) {newldr=255;}
-    analogWrite(bkl_pin, newldr);
-    if (!digitalRead(button1)) {button = 1;} //towards
-    if (!digitalRead(button2)) {button = 2;} //down
-    if (!digitalRead(button3)) {button = 3;} //away
-    if (!digitalRead(button4)) {button = 4;} //up
-    if (!digitalRead(button5)) {                //pressed
-        buttonTimer = millis();
-        button = 5;
-        while (!digitalRead(5))
-        {
-          delay(10);
-          if ((millis() - buttonTimer) > 2000) {
-            button = 6;
-            return;
+    if (autobright) {
+
+      ldr_read = analogRead(ldr_pin);
+      newldr = map(ldr_read, 0, 4096, 0, 255);
+      newldr = newldr + brightness;
+      if (newldr < 1) {newldr=1;}
+      if (newldr > 255) {newldr=255;}
+      analogWrite(bkl_pin, newldr);
+    }
+    
+    if (!menumode) {
+      if (!digitalRead(button1)) {button = 1;} //towards
+      if (!digitalRead(button2)) {button = 2;} //down
+      if (!digitalRead(button3)) {button = 3;} //away
+      if (!digitalRead(button4)) {button = 4;} //up
+      if (!digitalRead(button5)) {                //pressed
+          buttonTimer = millis();
+          button = 5;
+          while (!digitalRead(5))
+          {
+            delay(10);
+            if ((millis() - buttonTimer) > 2000) {
+              menumode = true;
+              return;
+            }
           }
         }
-        
-      } 
+        switch (button) {
+          case 1: 
+            doTempChart();
+            break;
+          case 2: 
+            doHumChart(); 
+            break;
+          case 3: 
+            doVocChart();
+            break;
+          case 4: 
+            doNoxChart();
+            break;
+          case 5: 
+            doMainDisplay();
+        }
+    }
+    else {  // editinterval, editcalib, editbright, editauto, menumode;  tempOffset brightness autobright
+          int MENU_MAX = 7;
+            if (!digitalRead(button2)) {
+            if (editinterval) {sampleSecs-=30;} else if (tempOffset) {tempOffset -= 0.1;} else if (editbright) {brightness-=1;} else if (editauto) {autobright = !autobright;} else {menusel++;}
+            if (menusel > MENU_MAX) {menusel = 1;}
+            if (menusel < 1) {menusel = MENU_MAX;}
+            if (sampleSecs < 30) {sampleSecs = 30;}
+            if (sampleSecs > 86400) {sampleSecs = 86400;}
+            if (brightness < 1) {brightness = 1;}
+            if (brightness > 255) {brightness = 255;}
+
+          }
+          if (!digitalRead(button4)) {
+
+            if (editinterval) {sampleSecs+=30;} else if (tempOffset) {tempOffset += 0.1;} else if (editbright) {brightness+=1;} else if (editauto) {autobright = !autobright;} else {menusel--;}
+            if (menusel > MENU_MAX) {menusel = 1;}
+            if (menusel < 1) {menusel = MENU_MAX;}
+            if (sampleSecs < 30) {sampleSecs = 30;}
+            if (sampleSecs > 86400) {sampleSecs = 86400;}
+            if (brightness < 1) {brightness = 1;}
+            if (brightness > 255) {brightness = 255;}
+
+          }
+          if (!digitalRead(5)) {
+              switch (menusel) {
+                case 1:
+                  { 
+                        img.fillScreen(TFT_BLACK);
+                        img.setCursor(0, 0);
+                        img.setTextSize(2);
+                        img.println("Use your mobile phone to connect to ");
+                        img.println("[VOC Meter Setup] then browse to");
+                        img.println("http://192.168.4.1 to connect to WiFi");
+                        img.pushSprite(0,0);
+                        WiFi.mode(WIFI_STA);
+                        wm.setConfigPortalTimeout(300);
+                        if (wm.getWiFiIsSaved()) {
+                          wm.startConfigPortal("VOC Meter Setup");
+                        }
+                        else {
+                          bool res;
+                              tft.setTextSize(2);
+                              tft.setCursor(0, 0);
+                          res = wm.autoConnect("VOC Meter Setup");
+                              if(!res) {  //if the wifi manager failed to connect to wifi
+                              tft.fillScreen(TFT_RED);
+                              tft.println("Failed to connect.");
+                              delay(3000);
+                          }
+                          else {
+                              //if you get here you have connected to the WiFi    
+                              tft.fillScreen(TFT_GREEN);
+                              tft.println("Connected!");
+                              Blynk.config(auth, IPAddress(216,110,224,105), 8080);
+                              Blynk.connect();
+                              while ((!Blynk.connected()) && (millis() < 20000)){
+                                  delay(500);
+                              }
+                              server.on("/", []() {
+                                server.send(200, "text/plain", "Hi! This is Chris's VOC meter. Try /update instead.");
+                              });
+
+                              ElegantOTA.begin(&server);    // Start ElegantOTA
+                              server.begin();
+                              ArduinoOTA.setHostname("chrisvoc");
+                              ArduinoOTA.begin();
+                              server.begin();
+                              tft.println("Update server started:");
+                              tft.print(WiFi.localIP());
+                              tft.println("/update");
+                              tft.println("Press button to continue.");
+                              while (digitalRead(button5)) {delay(10);}
+
+                          } 
+                        }
+                        break; 
+                  }
+                case 2:  // editinterval, editcalib, editbright, editauto, menumode;  tempOffset brightness autobright
+                    editinterval = !editinterval;
+                    preferences.begin("my-app", false);
+                    preferences.putUInt("sampleSecs", sampleSecs);
+                    preferences.end();
+                    break; 
+                case 3: 
+                    editcalib = !editcalib;
+                    preferences.begin("my-app", false);
+                    preferences.putFloat("tempOffset", tempOffset);
+                    preferences.end();
+                    break;
+                case 4: 
+                    editbright = !editbright;
+                    preferences.begin("my-app", false);
+                    preferences.putUInt("brightness", brightness);
+                    preferences.end();
+                    break;
+                case 5:    
+                    editauto = !editauto;
+                    preferences.begin("my-app", false);
+                    preferences.putBool("autobright", autobright);
+                    preferences.end();
+                    break;
+                case 6:    
+                    wm.resetSettings();
+                    tft.fillScreen(TFT_GREEN);
+                    tft.setCursor(0,0);
+                    tft.println("Wifi config deleted.");
+                    delay(3000);
+
+                    break;  
+                case 7: 
+                    menumode = false;
+                    break; 
+              }
+            }
+            displayMenu();
+    }
+
     if (abs(y) > abs(x)) {
       if (y > 0) {
         tft.setRotation(3); // Up
@@ -512,25 +751,10 @@ void loop() {
   }
 
   every(1000){
-    switch (button) {
-      case 1: 
-        doTempChart();
-        break;
-      case 2: 
-        doHumChart(); 
-        break;
-      case 3: 
-        doVocChart();
-        break;
-      case 4: 
-        doNoxChart();
-        break;
-      case 5: 
-        doMainDisplay();
-    }
+
 
     // 3. Measure SGP4x signals
-    if (conditioning_s > 0) {
+    if (conditioning_s > 0) { //
         // During NOx conditioning (10s) SRAW NOx will remain 0
         error =
             sgp41.executeConditioning(compensationRh, compensationT, srawVoc);
@@ -576,7 +800,16 @@ void loop() {
   }
 
   every (sampleSecs) {
+    
     takeSamples();
+    if (WiFi.status() == WL_CONNECTED) {
+       Blynk.virtualWrite(V71, srawVoc);
+       Blynk.virtualWrite(V72, srawNox);
+       Blynk.virtualWrite(V73, voc_index);
+       Blynk.virtualWrite(V74, nox_index);
+       Blynk.virtualWrite(V75, tempSHT);
+       Blynk.virtualWrite(V76, humidity);
+    }
   }
 
 }
