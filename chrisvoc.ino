@@ -35,7 +35,11 @@ WebServer server(80);
 #define button4 7
 #define button5 5
 #define maxArray 501
-bool editinterval, editcalib, editbright, editauto, menumode;
+bool editinterval = false;
+bool editcalib = false;
+bool editbright = false;
+bool editauto = false;
+bool menumode = false;
 float tempOffset = -0.7;
       int newldr;
 int sampleSecs = 30 * 1000;
@@ -142,8 +146,8 @@ void doMainDisplay(){
 
 void displayMenu(){
 
-  int fontsize = 16;
-  img.setTextSize(2);
+  int fontsize = 8;
+  img.setTextSize(1);
   img.fillScreen(TFT_BLACK);
   img.setCursor(0, 0);
   img.setTextColor(TFT_WHITE, TFT_BLACK);
@@ -416,8 +420,39 @@ void setup() {
   brightness = preferences.getUInt("brightness", 20);
   autobright = preferences.getBool("autobright", true);
   preferences.end();
+    Wire.begin();
+      if (!mpu.begin()) {
+    Serial.println("Failed to find MPU6050 chip");
+  }
+  mpu.setAccelerometerRange(MPU6050_RANGE_2_G);
+  mpu.setFilterBandwidth(MPU6050_BAND_5_HZ);
+  Serial.println("MPU6050 ready!");
   tft.init();
   tft.setRotation(0);
+    sensors_event_t a, g, temp;
+    mpu.getEvent(&a, &g, &temp);
+
+    // Determine dominant axis
+    float x = a.acceleration.x;
+    float y = a.acceleration.y;
+
+    if (abs(y) > abs(x)) {
+      if (y > 0) {
+        tft.setRotation(3); // Up
+        //Serial.println("Orientation: UP");
+      } else {
+        tft.setRotation(1); // Down
+        //Serial.println("Orientation: DOWN");
+      }
+    } else {
+      if (x > 0) {
+        tft.setRotation(0); // Right
+        //Serial.println("Orientation: RIGHT");
+      } else {
+        tft.setRotation(2); // Left
+        //Serial.println("Orientation: LEFT");
+      }
+    }
   tft.fillScreen(TFT_BLACK);
   tft.drawRect(0,0, tft.width(), tft.height(), TFT_WHITE);
 
@@ -433,11 +468,17 @@ void setup() {
     tft.print("Found wifi credentials, connecting...");  //display wifi connection progress
       WiFi.mode(WIFI_STA);
       WiFi.begin(wm.getWiFiSSID().c_str(), wm.getWiFiPass().c_str());
-
+      bool lowpower = false;
       // Wait for connection
       while (WiFi.status() != WL_CONNECTED) {
         delay(500);
         tft.print(".");
+        if ((millis() > 10000) && (!lowpower)) { //display.print("!");
+            lowpower = true;
+            tft.println("");
+            tft.print("Trying low-power mode...");
+            WiFi.setTxPower(WIFI_POWER_8_5dBm);
+        }
             if (millis() > 20000) {
                   tft.fillScreen(TFT_RED);
                   tft.setCursor(5,5);
@@ -472,7 +513,7 @@ void setup() {
 
       }
   }
-    Wire.begin();
+
       img.createSprite(240, 240);
       img.fillSprite(TFT_BLACK);
     sht4x.begin(Wire, SHT40_I2C_ADDR_44);
@@ -538,12 +579,7 @@ void setup() {
         compensationT = static_cast<uint16_t>((tempSHT + 45) * 65535 / 175);
         compensationRh = static_cast<uint16_t>(humSHT * 65535 / 100);
     }
-  if (!mpu.begin()) {
-    Serial.println("Failed to find MPU6050 chip");
-  }
-  mpu.setAccelerometerRange(MPU6050_RANGE_2_G);
-  mpu.setFilterBandwidth(MPU6050_BAND_10_HZ);
-  Serial.println("MPU6050 ready!");
+
   /*server.on("/", []() {
     server.send(200, "text/plain", "Hi! This is ElegantOTA Demo.");
   });
@@ -592,7 +628,13 @@ void loop() {
           {
             delay(10);
             if ((millis() - buttonTimer) > 2000) {
+              tft.setTextSize(2);
+              tft.setCursor(0, 0);
+              tft.fillScreen(TFT_BLACK);
+              tft.println("Loading menu...");
+              while (!digitalRead(5)) {delay(10);}
               menumode = true;
+              delay(100);
               return;
             }
           }
@@ -637,7 +679,7 @@ void loop() {
             if (brightness > 255) {brightness = 255;}
 
           }
-          if (!digitalRead(5)) {
+          if (!digitalRead(button5)) {
               switch (menusel) {
                 case 1:
                   { 
@@ -730,6 +772,7 @@ void loop() {
             }
             displayMenu();
     }
+
 
     if (abs(y) > abs(x)) {
       if (y > 0) {
