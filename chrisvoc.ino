@@ -1,3 +1,6 @@
+//#include <FS.h>
+//using fs::FS;
+
 #include <TFT_eSPI.h>
 #include <SPI.h>
 #include <Adafruit_MPU6050.h>
@@ -20,6 +23,7 @@
 #include <ElegantOTA.h>
 #include <ArduinoOTA.h>
 #include <Preferences.h>
+
 
 Preferences preferences;
 char auth[] = "eT_7FL7IUpqonthsAr-58uTK_-su_GYy";  //BLYNK
@@ -176,24 +180,26 @@ void doMainDisplay() {
   img.print("%");
 
   // Quadrant 3: Bottom-left
+  img.fillRect(0, 120, 120, 240, RGBto565(redVoc, greenVoc, blueVoc));
   img.setTextSize(2);                                      // Font size 2 (16px)
   img.setCursor(24 * scalingFactor, 104 * scalingFactor);  // Adjusted for bottom-left quadrant
   img.print("VOC:");
   img.setCursor(20 * scalingFactor, 140 * scalingFactor);  // Centered vertically in quadrant
   img.setTextSize(4);                                      // Font size 3 (24px)
   getVocColor(voc_index, redVoc, greenVoc, blueVoc);
-  img.fillRect(0, 120, 120, 240, RGBto565(redVoc, greenVoc, blueVoc));
+
   img.print(voc_index, 1);
 
 
   // Quadrant 4: Bottom-right
-  img.setTextSize(2);                                       // Font size 2 (16px)
+  img.setTextSize(2);         
+    img.fillRect(120, 120, 240, 240, RGBto565(redNox, greenNox, blueNox));// Font size 2 (16px)
   img.setCursor(124 * scalingFactor, 104 * scalingFactor);  // Adjusted for bottom-right quadrant
   img.print("NOX:");
   img.setCursor(130 * scalingFactor, 140 * scalingFactor);  // Centered vertically in quadrant
   img.setTextSize(4);                                       // Font size 3 (24px)
   getNoxColor(nox_index, redNox, greenNox, blueNox);
-  img.fillRect(120, 120, 240, 240, RGBto565(redNox, greenNox, blueNox));
+
   img.print(nox_index, 0);
 
   img.drawLine(119, 0, 119, 240, TFT_WHITE);  // Vertical center line
@@ -275,7 +281,7 @@ void displayMenu() {
     img.setTextColor(TFT_WHITE, TFT_BLACK);
   }
   float sampleMins = sampleSecs / 60.0;
-  img.print(sampleMins);
+  img.print(sampleMins, 1);
   img.println(" mins");
   img.setCursor(150, fontsize * 5);
   if (editcalib) {
@@ -283,7 +289,7 @@ void displayMenu() {
   } else {
     img.setTextColor(TFT_WHITE, TFT_BLACK);
   }
-  img.print(tempOffset);
+  img.print(tempOffset, 1);
   img.println(" c");
   img.setCursor(150, fontsize * 6);
   if (editbright) {
@@ -292,7 +298,7 @@ void displayMenu() {
     img.setTextColor(TFT_WHITE, TFT_BLACK);
   }
   img.print(brightness);
-  img.println(" (0-255)");
+  img.println(" (1-255)");
   img.setCursor(150, fontsize * 7);
   if (editauto) {
     img.setTextColor(TFT_BLACK, TFT_WHITE);
@@ -307,12 +313,13 @@ void displayMenu() {
   img.print(srawVoc);
   img.print(" | Raw Temp: ");
   img.print(temperature);
-  img.print("c | Hum: ");
-  img.print(humidity);
-  img.print("%");
+  img.print("c");
   img.setCursor(0, 114);
   img.print("rawNOX: ");
   img.print(srawNox);
+  img.print(" | Hum: ");
+  img.print(humidity);
+  img.print("%");
   img.pushSprite(0, 0);
 }
 
@@ -331,10 +338,6 @@ void setupChart() {
   img.print("*");
   img.print(sampleSecs * 60, 0);
   img.print("s-->");
-
-
-
-
   img.setCursor(145, 0);
 }
 
@@ -549,7 +552,7 @@ void buttonDOWN(){
 }
 
 void setup() {
-
+  setCpuFrequencyMhz(80);
   Serial.begin(115200);
   pinMode(bkl_pin, OUTPUT);
   digitalWrite(bkl_pin, HIGH);
@@ -560,7 +563,7 @@ void setup() {
   pinMode(button4, INPUT_PULLUP);
   pinMode(button5, INPUT_PULLUP);
   preferences.begin("my-app", false);
-  sampleSecs = preferences.getUInt("sampleSecs", 300);
+  sampleSecs = preferences.getUInt("sampleSecs", 30);
   tempOffset = preferences.getFloat("tempOffset", 0);
   brightness = preferences.getUInt("brightness", 20);
   autobright = preferences.getBool("autobright", true);
@@ -639,7 +642,7 @@ void setup() {
       }
     }
     if (WiFi.status() == WL_CONNECTED) {
-      tempOffset = -1.0;
+      tempOffset = -0.7;
       tft.fillScreen(TFT_GREEN);
       tft.setCursor(5, 5);
       tft.println("");
@@ -667,6 +670,7 @@ void setup() {
   }
 
   img.createSprite(240, 240);
+  img.setTextWrap(true);
   img.fillSprite(TFT_BLACK);
   sht4x.begin(Wire, SHT40_I2C_ADDR_44);
   sgp41.begin(Wire);
@@ -744,29 +748,7 @@ void loop() {
 
  delay(1);
 
-  every(200) {
-    const float FLAT_THRESHOLD = 8.0; // Adjust based on testing
-    sensors_event_t a, g, temp;
-    mpu.getEvent(&a, &g, &temp);
-
-    // Determine dominant axis
-    float x = a.acceleration.x;
-    float y = a.acceleration.y;
-    float z = a.acceleration.z;
-    if (!menumode) {
-      if (autobright) {
-
-        ldr_read = analogRead(ldr_pin);
-        newldr = map(ldr_read, 0, 4096, 0, 255);
-        newldr = newldr + brightness;
-        if (newldr < 1) { newldr = 1; }
-        if (newldr > 255) { newldr = 255; }
-        analogWrite(bkl_pin, newldr);
-      }
-      else {analogWrite(bkl_pin, brightness);}
-    }
-    else {analogWrite(bkl_pin, 255);}
-
+  every(100) {
     if (!menumode) {
       if (!digitalRead(button1)) { button = 1; }  //towards
       if (!digitalRead(button2)) { button = 2; }  //down
@@ -781,6 +763,7 @@ void loop() {
             tft.setTextSize(2);
             tft.setCursor(0, 0);
             tft.fillScreen(TFT_BLACK);
+            analogWrite(bkl_pin, 255);
             tft.println("Loading menu...");
             while (!digitalRead(5)) { delay(10); }
             menumode = true;
@@ -927,28 +910,7 @@ void loop() {
       displayMenu();
     }
 
-  if (abs(z) > FLAT_THRESHOLD) {
-    tft.setRotation(0);
-    
-  } else{
-      if (abs(y) > abs(x)) {
-        if (y > 0) {
-          tft.setRotation(3);  // Up
-          //Serial.println("Orientation: UP");
-        } else {
-          tft.setRotation(1);  // Down
-          //Serial.println("Orientation: DOWN");
-        }
-      } else {
-        if (x > 0) {
-          tft.setRotation(0);  // Right
-          //Serial.println("Orientation: RIGHT");
-        } else {
-          tft.setRotation(2);  // Left
-          //Serial.println("Orientation: LEFT");
-        }
-      }
-    }
+
   }
 
   every(1000) {
@@ -977,6 +939,53 @@ void loop() {
       voc_index = voc_algorithm.process(srawVoc);
       nox_index = nox_algorithm.process(srawNox);
     }
+  }
+
+  every(2000) {
+    const float FLAT_THRESHOLD = 8.0; // Adjust based on testing
+    sensors_event_t a, g, temp;
+    mpu.getEvent(&a, &g, &temp);
+
+    // Determine dominant axis
+    float x = a.acceleration.x;
+    float y = a.acceleration.y;
+    float z = a.acceleration.z;
+    if (!menumode) {
+      if (autobright) {
+
+        ldr_read = analogRead(ldr_pin);
+        newldr = map(ldr_read, 0, 4096, 0, 255);
+        newldr = newldr + brightness;
+        if (newldr < 1) { newldr = 1; }
+        if (newldr > 255) { newldr = 255; }
+        analogWrite(bkl_pin, newldr);
+      }
+      else {analogWrite(bkl_pin, brightness);}
+    }
+    else {analogWrite(bkl_pin, 255);}
+
+    if (abs(z) > FLAT_THRESHOLD) {
+      tft.setRotation(0);
+      
+    } else{
+        if (abs(y) > abs(x)) {
+          if (y > 0) {
+            tft.setRotation(3);  // Up
+            //Serial.println("Orientation: UP");
+          } else {
+            tft.setRotation(1);  // Down
+            //Serial.println("Orientation: DOWN");
+          }
+        } else {
+          if (x > 0) {
+            tft.setRotation(0);  // Right
+            //Serial.println("Orientation: RIGHT");
+          } else {
+            tft.setRotation(2);  // Left
+            //Serial.println("Orientation: LEFT");
+          }
+        }
+      }
   }
 
   every(15000) {
