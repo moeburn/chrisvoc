@@ -745,21 +745,27 @@ void loop() {
  delay(1);
 
   every(200) {
+    const float FLAT_THRESHOLD = 8.0; // Adjust based on testing
     sensors_event_t a, g, temp;
     mpu.getEvent(&a, &g, &temp);
 
     // Determine dominant axis
     float x = a.acceleration.x;
     float y = a.acceleration.y;
-    if (autobright) {
+    float z = a.acceleration.z;
+    if (!menumode) {
+      if (autobright) {
 
-      ldr_read = analogRead(ldr_pin);
-      newldr = map(ldr_read, 0, 4096, 0, 255);
-      newldr = newldr + brightness;
-      if (newldr < 1) { newldr = 1; }
-      if (newldr > 255) { newldr = 255; }
-      analogWrite(bkl_pin, newldr);
+        ldr_read = analogRead(ldr_pin);
+        newldr = map(ldr_read, 0, 4096, 0, 255);
+        newldr = newldr + brightness;
+        if (newldr < 1) { newldr = 1; }
+        if (newldr > 255) { newldr = 255; }
+        analogWrite(bkl_pin, newldr);
+      }
+      else {analogWrite(bkl_pin, brightness);}
     }
+    else {analogWrite(bkl_pin, 255);}
 
     if (!menumode) {
       if (!digitalRead(button1)) { button = 1; }  //towards
@@ -921,22 +927,26 @@ void loop() {
       displayMenu();
     }
 
-
-    if (abs(y) > abs(x)) {
-      if (y > 0) {
-        tft.setRotation(3);  // Up
-        //Serial.println("Orientation: UP");
+  if (abs(z) > FLAT_THRESHOLD) {
+    tft.setRotation(0);
+    
+  } else{
+      if (abs(y) > abs(x)) {
+        if (y > 0) {
+          tft.setRotation(3);  // Up
+          //Serial.println("Orientation: UP");
+        } else {
+          tft.setRotation(1);  // Down
+          //Serial.println("Orientation: DOWN");
+        }
       } else {
-        tft.setRotation(1);  // Down
-        //Serial.println("Orientation: DOWN");
-      }
-    } else {
-      if (x > 0) {
-        tft.setRotation(0);  // Right
-        //Serial.println("Orientation: RIGHT");
-      } else {
-        tft.setRotation(2);  // Left
-        //Serial.println("Orientation: LEFT");
+        if (x > 0) {
+          tft.setRotation(0);  // Right
+          //Serial.println("Orientation: RIGHT");
+        } else {
+          tft.setRotation(2);  // Left
+          //Serial.println("Orientation: LEFT");
+        }
       }
     }
   }
