@@ -61,6 +61,8 @@ float array1[maxArray];
 float array2[maxArray];
 float array3[maxArray];
 float array4[maxArray];
+uint8_t rng, gng, bng;
+uint8_t rvg, gvg, bvg;
 
 SensirionI2cSht4x sht4x;
 SensirionI2CSgp41 sgp41;
@@ -154,6 +156,12 @@ void getNoxColor(int nox_index, uint8_t &r, uint8_t &g, uint8_t &b) {
   }
 }
 
+// Function to calculate the contrasting text color (black or white)
+uint16_t getContrastTextColor(uint8_t r, uint8_t g, uint8_t b) {
+    float luminance = 0.299 * r + 0.587 * g + 0.114 * b;
+    return (luminance > 128) ? TFT_BLACK : TFT_WHITE;
+}
+
 void doMainDisplay() {
 
   img.fillSprite(TFT_BLACK);
@@ -161,45 +169,53 @@ void doMainDisplay() {
 
   img.setTextSize(2);                                    // Font size 2 (16px)
   img.setCursor(24 * scalingFactor, 2 * scalingFactor);  // Adjusted to fit top-left quadrant
+  img.setTextColor(TFT_PINK);
   img.println("Temp:");
+  img.setTextColor(TFT_WHITE);
   // img.setTextSize(1);
   // img.println(ldr_read);
   // img.print(newldr);
   img.setCursor(6 * scalingFactor, 40 * scalingFactor);  // Centered vertically in quadrant
   img.setTextSize(3);                                    // Font size 3 (24px)
   img.print(tempSHT, 1);
+  img.print((char)247);
   img.print("c");
 
   // Quadrant 2: Top-right
   img.setTextSize(2);                                     // Font size 2 (16px)
-  img.setCursor(124 * scalingFactor, 2 * scalingFactor);  // Adjusted to fit top-right quadrant
+  img.setCursor(128 * scalingFactor, 2 * scalingFactor);  // Adjusted to fit top-right quadrant
+  img.setTextColor(TFT_CYAN);
   img.print("Hum:");
+  img.setTextColor(TFT_WHITE);
   img.setCursor(122 * scalingFactor, 40 * scalingFactor);  // Centered vertically in quadrant
   img.setTextSize(3);                                      // Font size 3 (24px)
   img.print(humidity, 1);
   img.print("%");
+  
 
   // Quadrant 3: Bottom-left
+  getVocColor(voc_index, redVoc, greenVoc, blueVoc);
+  uint16_t textColor1 = getContrastTextColor(redVoc, greenVoc, blueVoc);
+  img.setTextColor(textColor1);
   img.fillRect(0, 120, 120, 240, RGBto565(redVoc, greenVoc, blueVoc));
   img.setTextSize(2);                                      // Font size 2 (16px)
-  img.setCursor(24 * scalingFactor, 104 * scalingFactor);  // Adjusted for bottom-left quadrant
+  img.setCursor(28 * scalingFactor, 108 * scalingFactor);  // Adjusted for bottom-left quadrant
   img.print("VOC:");
   img.setCursor(20 * scalingFactor, 140 * scalingFactor);  // Centered vertically in quadrant
   img.setTextSize(4);                                      // Font size 3 (24px)
-  getVocColor(voc_index, redVoc, greenVoc, blueVoc);
-
   img.print(voc_index, 1);
 
 
   // Quadrant 4: Bottom-right
-  img.setTextSize(2);         
-    img.fillRect(120, 120, 240, 240, RGBto565(redNox, greenNox, blueNox));// Font size 2 (16px)
-  img.setCursor(124 * scalingFactor, 104 * scalingFactor);  // Adjusted for bottom-right quadrant
+  img.setTextSize(2);   
+  getNoxColor(nox_index, redNox, greenNox, blueNox);      
+  uint16_t textColor2 = getContrastTextColor(redNox, greenNox, blueNox);
+  img.setTextColor(textColor2);
+  img.fillRect(120, 120, 240, 240, RGBto565(redNox, greenNox, blueNox));// Font size 2 (16px)
+  img.setCursor(128 * scalingFactor, 108 * scalingFactor);  // Adjusted for bottom-right quadrant
   img.print("NOX:");
   img.setCursor(130 * scalingFactor, 140 * scalingFactor);  // Centered vertically in quadrant
   img.setTextSize(4);                                       // Font size 3 (24px)
-  getNoxColor(nox_index, redNox, greenNox, blueNox);
-
   img.print(nox_index, 0);
 
   img.drawLine(119, 0, 119, 240, TFT_WHITE);  // Vertical center line
@@ -313,6 +329,7 @@ void displayMenu() {
   img.print(srawVoc);
   img.print(" | Raw Temp: ");
   img.print(temperature);
+  img.print((char)247);
   img.print("c");
   img.setCursor(0, 114);
   img.print("rawNOX: ");
@@ -323,28 +340,31 @@ void displayMenu() {
   img.pushSprite(0, 0);
 }
 
-void setupChart() {
+void setupChart(int decimals) {
+  img.setTextSize(1);
+  img.setTextColor(TFT_WHITE);
   img.setCursor(0, 0);
   img.print("<");
-  img.print(maxVal, 3);
+  img.print(maxVal, decimals);
 
   img.setCursor(0, 229);  // Adjusted for 240x240 display
   img.print("<");
-  img.print(minVal, 3);
+  img.print(minVal, decimals);
 
   img.setCursor(120, 229);  // Adjusted for new width
   img.print("<--");
   img.print(readingCount - 1, 0);
   img.print("*");
-  img.print(sampleSecs * 60, 0);
+  img.print(sampleSecs, 0);
   img.print("s-->");
   img.setCursor(145, 0);
 }
 
 void doTempChart() {
-  setupChart();
+  
   minVal = array1[maxArray - readingCount];
   maxVal = array1[maxArray - readingCount];
+
 
   for (int i = maxArray - readingCount + 1; i < maxArray; i++) {
     if (array1[i] != 0) {
@@ -369,20 +389,22 @@ void doTempChart() {
     int y1 = 239 - ((array1[i + 1] - minVal) * yScale);
 
     if (array1[i] != 0) {
-      img.drawLine(x0, y0, x1, y1, TFT_WHITE);
+      img.drawLine(x0, y0, x1, y1, TFT_PINK);
     }
   }
-  setupChart();
+  setupChart(2);
   img.print("[Temp: ");
-  img.print(array1[(maxArray - 1)], 3);
+  img.print(array1[(maxArray - 1)], 2);
+  img.print((char)247);
   img.print("c]");
   img.pushSprite(0, 0);
 }
 
 void doHumChart() {
-  setupChart();
+  
   minVal = array2[maxArray - readingCount];
   maxVal = array2[maxArray - readingCount];
+
 
   for (int i = maxArray - readingCount + 1; i < maxArray; i++) {
     if ((array2[i] < minVal) && (array2[i] > 0)) {
@@ -406,20 +428,21 @@ void doHumChart() {
     int y1 = 239 - ((array2[i + 1] - minVal) * yScale);
 
     if (array2[i] > 0) {
-      img.drawLine(x0, y0, x1, y1, TFT_WHITE);
+      img.drawLine(x0, y0, x1, y1, TFT_CYAN);
     }
   }
-  setupChart();
+  setupChart(2);
   img.print("[Hum: ");
-  img.print(array2[(maxArray - 1)], 0);
+  img.print(array2[(maxArray - 1)], 1);
   img.print("%]");
   img.pushSprite(0, 0);
 }
 
 void doVocChart() {
-  setupChart();
+  
   minVal = array3[maxArray - readingCount];
   maxVal = array3[maxArray - readingCount];
+
 
   for (int i = maxArray - readingCount + 1; i < maxArray; i++) {
     if ((array3[i] < minVal) && (array3[i] > 0)) {
@@ -436,25 +459,26 @@ void doVocChart() {
 
   img.fillRect(0, 0, img.width(), img.height(), TFT_BLACK);
 
+
   for (int i = maxArray - readingCount; i < (maxArray - 1); i++) {
     int x0 = (i - (maxArray - readingCount)) * xStep;
     int y0 = 239 - ((array3[i] - minVal) * yScale);
     int x1 = (i + 1 - (maxArray - readingCount)) * xStep;
     int y1 = 239 - ((array3[i + 1] - minVal) * yScale);
-
+    getVocColor(array3[i], rvg, gvg, bvg);
     if (array3[i] > 0) {
-      img.drawLine(x0, y0, x1, y1, TFT_WHITE);
+      img.drawLine(x0, y0, x1, y1, RGBto565(rvg,gvg,bvg));
     }
   }
-  setupChart();
+  setupChart(0);
   img.print("[VOC Index: ");
-  img.print(array3[(maxArray - 1)], 2);
+  img.print(array3[(maxArray - 1)], 0);
   img.print("]");
   img.pushSprite(0, 0);
 }
 
 void doNoxChart() {
-  setupChart();
+
   minVal = array4[maxArray - readingCount];
   maxVal = array4[maxArray - readingCount];
 
@@ -472,20 +496,20 @@ void doNoxChart() {
 
 
   img.fillRect(0, 0, img.width(), img.height(), TFT_BLACK);
-
+  
   for (int i = maxArray - readingCount; i < (maxArray - 1); i++) {
     int x0 = (i - (maxArray - readingCount)) * xStep;
     int y0 = 239 - ((array4[i] - minVal) * yScale);
     int x1 = (i + 1 - (maxArray - readingCount)) * xStep;
     int y1 = 239 - ((array4[i + 1] - minVal) * yScale);
-
+    getNoxColor(array4[i], rng, gng, bng);
     if (array4[i] > 0) {
-      img.drawLine(x0, y0, x1, y1, TFT_WHITE);
+      img.drawLine(x0, y0, x1, y1, RGBto565(rng,gng,bng));
     }
   }
-  setupChart();
+  setupChart(0);
   img.print("[Raw NOX: ");
-  img.print(array4[(maxArray - 1)], 2);
+  img.print(array4[(maxArray - 1)], 0);
   img.print("]");
   img.pushSprite(0, 0);
 }
@@ -505,15 +529,19 @@ void takeSamples() {
   }
   array2[(maxArray - 1)] = humidity;
 
-  for (int i = 0; i < (maxArray - 1); i++) {
-    array3[i] = array3[i + 1];
+  if (voc_index > 0) {
+    for (int i = 0; i < (maxArray - 1); i++) {
+      array3[i] = array3[i + 1];
+    }
+    array3[(maxArray - 1)] = voc_index;
   }
-  array3[(maxArray - 1)] = voc_index;
 
-  for (int i = 0; i < (maxArray - 1); i++) {
-    array4[i] = array4[i + 1];
+  if (nox_index > 0) {
+    for (int i = 0; i < (maxArray - 1); i++) {
+      array4[i] = array4[i + 1];
+    }
+    array4[(maxArray - 1)] = nox_index;
   }
-  array4[(maxArray - 1)] = srawNox;
 }
 
 void buttonUP(){
@@ -585,24 +613,31 @@ void setup() {
   // Determine dominant axis
   float x = a.acceleration.x;
   float y = a.acceleration.y;
+  float z = a.acceleration.z;
+  const float FLAT_THRESHOLD = 8.0; // Adjust based on testing
 
-  if (abs(y) > abs(x)) {
-    if (y > 0) {
-      tft.setRotation(3);  // Up
-      //Serial.println("Orientation: UP");
-    } else {
-      tft.setRotation(1);  // Down
-      //Serial.println("Orientation: DOWN");
-    }
-  } else {
-    if (x > 0) {
-      tft.setRotation(0);  // Right
-      //Serial.println("Orientation: RIGHT");
-    } else {
-      tft.setRotation(2);  // Left
-      //Serial.println("Orientation: LEFT");
-    }
-  }
+    if (abs(z) > FLAT_THRESHOLD) {
+      tft.setRotation(0);
+      
+    } else{
+        if (abs(y) > abs(x)) {
+          if (y > 0) {
+            tft.setRotation(3);  // Up
+            //Serial.println("Orientation: UP");
+          } else {
+            tft.setRotation(1);  // Down
+            //Serial.println("Orientation: DOWN");
+          }
+        } else {
+          if (x > 0) {
+            tft.setRotation(0);  // Right
+            //Serial.println("Orientation: RIGHT");
+          } else {
+            tft.setRotation(2);  // Left
+            //Serial.println("Orientation: LEFT");
+          }
+        }
+      }
   tft.fillScreen(TFT_BLACK);
   tft.drawRect(0, 0, tft.width(), tft.height(), TFT_WHITE);
 
@@ -610,13 +645,13 @@ void setup() {
   tft.setTextColor(TFT_WHITE, TFT_BLACK);
   tft.setTextDatum(TR_DATUM);
   tft.setTextWrap(true);  // Wrap on width
-  tft.setTextSize(1);
-  tft.print("Loading...");  //display wifi connection progress
+  tft.setTextSize(2);
+  tft.println("Loading VOC Meter...");  //display wifi connection progress
   
   if (wifisaved) {
 
-    tft.fillScreen(TFT_BLACK);
-    tft.setCursor(5, 5);
+    //tft.fillScreen(TFT_BLACK);
+    //tft.setCursor(5, 5);
     tft.print("Found wifi credentials, connecting to ");  //display wifi connection progress
     tft.print(wm.getWiFiSSID());
 
@@ -746,7 +781,7 @@ void loop() {
     Blynk.run();
   }
 
- delay(1);
+ delay(10);
 
   every(100) {
     if (!menumode) {
