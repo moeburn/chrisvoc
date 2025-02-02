@@ -54,6 +54,8 @@ int newldr;
 int sampleSecs = 30;
 int sampleMilliSecs = sampleSecs * 1000;
 int brightness = 20;
+static int previous_brightness = -1;
+const int hysteresis_threshold = 4;  // Adjust this value as needed
 bool autobright = true;
 bool wifisaved = false;
 int MENU_MAX = 7;
@@ -646,7 +648,7 @@ void setup() {
   tft.setTextDatum(TR_DATUM);
   tft.setTextWrap(true);  // Wrap on width
   tft.setTextSize(2);
-  tft.println("Loading VOC Meter...");  //display wifi connection progress
+  tft.println("Loading VOC Meter...");  
   
   if (wifisaved) {
 
@@ -700,7 +702,8 @@ void setup() {
       server.begin();
       ArduinoOTA.setHostname("chrisvoc");
       ArduinoOTA.begin();
-      delay(3000);
+      delay(500);
+      while (millis() < 5000){delay(10);}
     }
   }
 
@@ -889,6 +892,7 @@ void loop() {
                   tft.setCursor(0, 0);
                   tft.fillScreen(TFT_BLACK);
                   tft.println("Loading menu...");
+                  
                 }
               }
               break;
@@ -990,10 +994,18 @@ void loop() {
 
         ldr_read = analogRead(ldr_pin);
         newldr = map(ldr_read, 0, 4096, 0, 255);
-        newldr = newldr + brightness;
-        if (newldr < 1) { newldr = 1; }
-        if (newldr > 255) { newldr = 255; }
-        analogWrite(bkl_pin, newldr);
+        // Apply non-linear scaling for indoor brightness adjustment
+        float scale = newldr / 255.0;
+        newldr = (int)(pow(scale, 0.45) * 255);  // 0.75 gamma boosts mid-range brightness
+
+        // Apply hysteresis to prevent flickering
+        if (previous_brightness == -1 || abs(newldr - previous_brightness) > hysteresis_threshold) {
+            previous_brightness = newldr;
+            newldr += brightness;
+            if (newldr < 1) { newldr = 1; }
+            if (newldr > 255) { newldr = 255; }
+            analogWrite(bkl_pin, newldr);
+        }
       }
       else {analogWrite(bkl_pin, brightness);}
     }
