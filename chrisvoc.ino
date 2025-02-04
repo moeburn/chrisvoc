@@ -23,6 +23,10 @@
 #include <ElegantOTA.h>
 #include <ArduinoOTA.h>
 #include <Preferences.h>
+#include "Fonts/Open_Sans_Condensed_Bold_60.h"
+
+
+#define MYFONT32 &Open_Sans_Condensed_Bold_60
 
 
 Preferences preferences;
@@ -43,7 +47,7 @@ WebServer server(80);
 #define button5 5
 #define maxArray 501
 int chartfont = 2;
-
+int lastRotation = 0;  // Stores the last known rotation
 bool editinterval = false;
 bool editcalib = false;
 bool editbright = false;
@@ -169,21 +173,26 @@ uint16_t getContrastTextColor(uint8_t r, uint8_t g, uint8_t b) {
 void doMainDisplay() {
 
   img.fillSprite(TFT_BLACK);
-
+  img.setTextDatum(TC_DATUM);
  img.setTextSize(1);
   //img.setTextFont(4);                                    // Font size 2 (16px)
   img.setTextFont(4);
-  img.setCursor(24 * scalingFactor, 2 * scalingFactor);  // Adjusted to fit top-left quadrant
+  //img.setCursor(60, 2 * scalingFactor);  // Adjusted to fit top-left quadrant
   img.setTextColor(TFT_PINK);
-  img.println("Temp:");
+  String temptitle = "Temp";
+  //img.println("Temp");
+  img.drawString(temptitle, 60, 2);
   //img.setTextColor(TFT_WHITE);
   
   // img.println(ldr_read);
   // img.print(newldr);
-  img.setCursor(4, 40 * scalingFactor);  // Centered vertically in quadrant
+  img.setTextDatum(TR_DATUM);
+  //img.setCursor(105, 40 * scalingFactor);  // Centered vertically in quadrant
   //img.setTextFont(6);                                    // Font size 3 (24px)
   img.setTextFont(6);
-  img.print(tempSHT, 1);
+  img.drawFloat(tempSHT, 1, 100, 48);
+  //img.print(tempSHT, 1);
+  img.setCursor(102, 48); 
   img.setTextFont(1);
   img.print((char)247);
   img.setTextFont(2);
@@ -191,13 +200,18 @@ void doMainDisplay() {
 
   // Quadrant 2: Top-right
   img.setTextFont(4);                                     // Font size 2 (16px)
-  img.setCursor(128 * scalingFactor, 2 * scalingFactor);  // Adjusted to fit top-right quadrant
+  img.setTextDatum(TC_DATUM);
+  //img.setCursor(180, 2 * scalingFactor);  // Adjusted to fit top-right quadrant
   img.setTextColor(TFT_CYAN);
-  img.print("Hum:");
+  String humtitle = "Hum";
+  img.drawString(humtitle, 180, 2);
+  //img.print("Hum");
   //img.setTextColor(TFT_WHITE);
-  img.setCursor(125, 40 * scalingFactor);  // Centered vertically in quadrant
-  img.setTextFont(6);                                      // Font size 3 (24px)
-  img.print(humidity, 1);
+  img.setTextDatum(TR_DATUM);
+  img.setCursor(230, 48);  // Centered vertically in quadrant
+  img.setTextFont(6);        
+  img.drawFloat(humidity, 1, 224, 48);                              // Font size 3 (24px)
+  //img.print(humidity, 1);
   img.setTextFont(2);
   img.print("%");
   
@@ -205,14 +219,19 @@ void doMainDisplay() {
   // Quadrant 3: Bottom-left
   getVocColor(voc_index, redVoc, greenVoc, blueVoc);
   uint16_t textColor1 = getContrastTextColor(redVoc, greenVoc, blueVoc);
+  String voctitle = "VOC";
   img.setTextColor(textColor1);
   img.fillRect(0, 120, 120, 240, RGBto565(redVoc, greenVoc, blueVoc));
   img.setTextFont(4);                                      // Font size 2 (16px)
-  img.setCursor(28 * scalingFactor, 108 * scalingFactor);  // Adjusted for bottom-left quadrant
-  img.print("VOC:");
-  img.setCursor(20 * scalingFactor, 140 * scalingFactor);  // Centered vertically in quadrant
-  img.setTextFont(6);                                      // Font size 3 (24px)
-  img.print(voc_index, 0);
+  img.setTextDatum(TC_DATUM);
+  img.drawString(voctitle, 60, 130);
+  //img.setCursor(60, 108 * scalingFactor);  // Adjusted for bottom-left quadrant
+  //img.print("VOC");
+  //img.setCursor(60, 140 * scalingFactor);  // Centered vertically in quadrant
+  //img.setTextFont(6);                                      // Font size 3 (24px)
+  img.setFreeFont(MYFONT32);   
+  //img.print(voc_index, 0);
+  img.drawNumber(voc_index, 60, 168);
 
 
   // Quadrant 4: Bottom-right
@@ -221,11 +240,16 @@ void doMainDisplay() {
   uint16_t textColor2 = getContrastTextColor(redNox, greenNox, blueNox);
   img.setTextColor(textColor2);
   img.fillRect(120, 120, 240, 240, RGBto565(redNox, greenNox, blueNox));// Font size 2 (16px)
-  img.setCursor(128 * scalingFactor, 108 * scalingFactor);  // Adjusted for bottom-right quadrant
-  img.print("NOX:");
-  img.setCursor(130 * scalingFactor, 140 * scalingFactor);  // Centered vertically in quadrant
-  img.setTextFont(6);                                       // Font size 3 (24px)
-  img.print(nox_index, 0);
+  img.setCursor(180, 108 * scalingFactor);  // Adjusted for bottom-right quadrant
+  String noxtitle = "NOX";
+  //img.print("NOX:");
+  img.setTextDatum(TC_DATUM);
+  img.drawString(noxtitle, 180, 130);
+  //img.setCursor(180, 140 * scalingFactor);  // Centered vertically in quadrant
+  //img.setTextFont(6);                                       // Font size 3 (24px)
+  img.setFreeFont(MYFONT32);   
+  img.drawNumber(nox_index, 180, 168);
+  //img.print(nox_index, 0);
 
   img.drawLine(119, 0, 119, 240, TFT_WHITE);  // Vertical center line
   img.drawLine(120, 0, 120, 240, TFT_WHITE);  // Vertical center line (thicker)
@@ -237,6 +261,7 @@ void doMainDisplay() {
   // img.setCursor(130 * scalingFactor, (140 * scalingFactor) + 28); // Centered vertically in quadrant
   // img.print(srawNox, 0);
   img.pushSprite(0, 0);
+  img.setTextDatum(TL_DATUM);
 }
 
 
@@ -997,7 +1022,35 @@ void loop() {
     float x = a.acceleration.x;
     float y = a.acceleration.y;
     float z = a.acceleration.z;
-    if (!menumode) {
+
+
+    if (abs(z) > FLAT_THRESHOLD) {
+      // Device is flat, maintain the last known rotation
+      tft.setRotation(lastRotation);
+
+    } else {
+      if (abs(y) > abs(x)) {
+        if (y > 0 && lastRotation != 3) {
+          tft.setRotation(3);  // Up
+          lastRotation = 3;
+        } else if (y < 0 && lastRotation != 1) {
+          tft.setRotation(1);  // Down
+          lastRotation = 1;
+        }
+      } else {
+        if (x > 0 && lastRotation != 0) {
+          tft.setRotation(0);  // Right
+          lastRotation = 0;
+        } else if (x < 0 && lastRotation != 2) {
+          tft.setRotation(2);  // Left
+          lastRotation = 2;
+        }
+      }
+    }
+  }
+
+  every(4000){
+        if (!menumode) {
       if (autobright) {
 
         ldr_read = analogRead(ldr_pin);
@@ -1018,29 +1071,6 @@ void loop() {
       else {analogWrite(bkl_pin, brightness);}
     }
     else {analogWrite(bkl_pin, 255);}
-
-    if (abs(z) > FLAT_THRESHOLD) {
-      tft.setRotation(0);
-      
-    } else{
-        if (abs(y) > abs(x)) {
-          if (y > 0) {
-            tft.setRotation(3);  // Up
-            //Serial.println("Orientation: UP");
-          } else {
-            tft.setRotation(1);  // Down
-            //Serial.println("Orientation: DOWN");
-          }
-        } else {
-          if (x > 0) {
-            tft.setRotation(0);  // Right
-            //Serial.println("Orientation: RIGHT");
-          } else {
-            tft.setRotation(2);  // Left
-            //Serial.println("Orientation: LEFT");
-          }
-        }
-      }
   }
 
   every(15000) {
@@ -1068,11 +1098,13 @@ void loop() {
   every(sampleMilliSecs) {
 
     takeSamples();
-    Blynk.virtualWrite(V101, srawVoc);
-    Blynk.virtualWrite(V102, srawNox);
-    Blynk.virtualWrite(V103, voc_index);
-    Blynk.virtualWrite(V104, nox_index);
-    Blynk.virtualWrite(V75, tempSHT);
-    Blynk.virtualWrite(V76, humidity);
+    if (WiFi.status() == WL_CONNECTED) {
+      Blynk.virtualWrite(V101, srawVoc);
+      Blynk.virtualWrite(V102, srawNox);
+      Blynk.virtualWrite(V103, voc_index);
+      Blynk.virtualWrite(V104, nox_index);
+      Blynk.virtualWrite(V75, tempSHT);
+      Blynk.virtualWrite(V76, humidity);
+    }
   }
 }
