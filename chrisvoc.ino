@@ -42,6 +42,8 @@ WebServer server(80);
 #define button4 7
 #define button5 5
 #define maxArray 501
+int chartfont = 2;
+
 bool editinterval = false;
 bool editcalib = false;
 bool editbright = false;
@@ -55,7 +57,7 @@ int sampleSecs = 30;
 int sampleMilliSecs = sampleSecs * 1000;
 int brightness = 20;
 static int previous_brightness = -1;
-const int hysteresis_threshold = 4;  // Adjust this value as needed
+const int hysteresis_threshold = 5;  // Adjust this value as needed
 bool autobright = true;
 bool wifisaved = false;
 int MENU_MAX = 7;
@@ -168,30 +170,35 @@ void doMainDisplay() {
 
   img.fillSprite(TFT_BLACK);
 
-
-  img.setTextSize(2);                                    // Font size 2 (16px)
+ img.setTextSize(1);
+  //img.setTextFont(4);                                    // Font size 2 (16px)
+  img.setTextFont(4);
   img.setCursor(24 * scalingFactor, 2 * scalingFactor);  // Adjusted to fit top-left quadrant
   img.setTextColor(TFT_PINK);
   img.println("Temp:");
-  img.setTextColor(TFT_WHITE);
-  // img.setTextSize(1);
+  //img.setTextColor(TFT_WHITE);
+  
   // img.println(ldr_read);
   // img.print(newldr);
-  img.setCursor(6 * scalingFactor, 40 * scalingFactor);  // Centered vertically in quadrant
-  img.setTextSize(3);                                    // Font size 3 (24px)
+  img.setCursor(4, 40 * scalingFactor);  // Centered vertically in quadrant
+  //img.setTextFont(6);                                    // Font size 3 (24px)
+  img.setTextFont(6);
   img.print(tempSHT, 1);
+  img.setTextFont(1);
   img.print((char)247);
+  img.setTextFont(2);
   img.print("c");
 
   // Quadrant 2: Top-right
-  img.setTextSize(2);                                     // Font size 2 (16px)
+  img.setTextFont(4);                                     // Font size 2 (16px)
   img.setCursor(128 * scalingFactor, 2 * scalingFactor);  // Adjusted to fit top-right quadrant
   img.setTextColor(TFT_CYAN);
   img.print("Hum:");
-  img.setTextColor(TFT_WHITE);
-  img.setCursor(122 * scalingFactor, 40 * scalingFactor);  // Centered vertically in quadrant
-  img.setTextSize(3);                                      // Font size 3 (24px)
+  //img.setTextColor(TFT_WHITE);
+  img.setCursor(125, 40 * scalingFactor);  // Centered vertically in quadrant
+  img.setTextFont(6);                                      // Font size 3 (24px)
   img.print(humidity, 1);
+  img.setTextFont(2);
   img.print("%");
   
 
@@ -200,16 +207,16 @@ void doMainDisplay() {
   uint16_t textColor1 = getContrastTextColor(redVoc, greenVoc, blueVoc);
   img.setTextColor(textColor1);
   img.fillRect(0, 120, 120, 240, RGBto565(redVoc, greenVoc, blueVoc));
-  img.setTextSize(2);                                      // Font size 2 (16px)
+  img.setTextFont(4);                                      // Font size 2 (16px)
   img.setCursor(28 * scalingFactor, 108 * scalingFactor);  // Adjusted for bottom-left quadrant
   img.print("VOC:");
   img.setCursor(20 * scalingFactor, 140 * scalingFactor);  // Centered vertically in quadrant
-  img.setTextSize(4);                                      // Font size 3 (24px)
-  img.print(voc_index, 1);
+  img.setTextFont(6);                                      // Font size 3 (24px)
+  img.print(voc_index, 0);
 
 
   // Quadrant 4: Bottom-right
-  img.setTextSize(2);   
+  img.setTextFont(4);   
   getNoxColor(nox_index, redNox, greenNox, blueNox);      
   uint16_t textColor2 = getContrastTextColor(redNox, greenNox, blueNox);
   img.setTextColor(textColor2);
@@ -217,7 +224,7 @@ void doMainDisplay() {
   img.setCursor(128 * scalingFactor, 108 * scalingFactor);  // Adjusted for bottom-right quadrant
   img.print("NOX:");
   img.setCursor(130 * scalingFactor, 140 * scalingFactor);  // Centered vertically in quadrant
-  img.setTextSize(4);                                       // Font size 3 (24px)
+  img.setTextFont(6);                                       // Font size 3 (24px)
   img.print(nox_index, 0);
 
   img.drawLine(119, 0, 119, 240, TFT_WHITE);  // Vertical center line
@@ -234,8 +241,8 @@ void doMainDisplay() {
 
 
 void displayMenu() {
-
-  int fontsize = 8;
+  img.setTextFont(2);
+  int fontsize = 16;
   img.setTextSize(1);
   img.fillScreen(TFT_BLACK);
   img.setCursor(0, 0);
@@ -249,44 +256,45 @@ void displayMenu() {
   } else {
     img.setCursor(0, fontsize * 3);
   }
+  int selcolor = TFT_CYAN;
   if (menusel == 1) {
-    img.setTextColor(TFT_BLACK, TFT_WHITE);
+    img.setTextColor(TFT_BLACK, selcolor);
   } else {
     img.setTextColor(TFT_WHITE, TFT_BLACK);
   }
   img.println("Start Wifi");
   if (menusel == 2) {
-    img.setTextColor(TFT_BLACK, TFT_WHITE);
+    img.setTextColor(TFT_BLACK, selcolor);
   } else {
     img.setTextColor(TFT_WHITE, TFT_BLACK);
   }
   img.println("Change Sample Rate");
   if (menusel == 3) {
-    img.setTextColor(TFT_BLACK, TFT_WHITE);
+    img.setTextColor(TFT_BLACK, selcolor);
   } else {
     img.setTextColor(TFT_WHITE, TFT_BLACK);
   }
   img.println("Set Temp Offset");
   if (menusel == 4) {
-    img.setTextColor(TFT_BLACK, TFT_WHITE);
+    img.setTextColor(TFT_BLACK, selcolor);
   } else {
     img.setTextColor(TFT_WHITE, TFT_BLACK);
   }
   img.println("Set Brightness");
   if (menusel == 5) {
-    img.setTextColor(TFT_BLACK, TFT_WHITE);
+    img.setTextColor(TFT_BLACK, selcolor);
   } else {
     img.setTextColor(TFT_WHITE, TFT_BLACK);
   }
   img.println("Auto Brightness");
   if (menusel == 6) {
-    img.setTextColor(TFT_BLACK, TFT_WHITE);
+    img.setTextColor(TFT_BLACK, selcolor);
   } else {
     img.setTextColor(TFT_WHITE, TFT_BLACK);
   }
   img.println("Forget Wifi.");
   if (menusel == 7) {
-    img.setTextColor(TFT_BLACK, TFT_WHITE);
+    img.setTextColor(TFT_BLACK, selcolor);
   } else {
     img.setTextColor(TFT_WHITE, TFT_BLACK);
   }
@@ -294,7 +302,7 @@ void displayMenu() {
 
   img.setCursor(150, fontsize * 4);
   if (editinterval) {
-    img.setTextColor(TFT_BLACK, TFT_WHITE);
+    img.setTextColor(TFT_BLACK, selcolor);
   } else {
     img.setTextColor(TFT_WHITE, TFT_BLACK);
   }
@@ -303,7 +311,7 @@ void displayMenu() {
   img.println(" mins");
   img.setCursor(150, fontsize * 5);
   if (editcalib) {
-    img.setTextColor(TFT_BLACK, TFT_WHITE);
+    img.setTextColor(TFT_BLACK, selcolor);
   } else {
     img.setTextColor(TFT_WHITE, TFT_BLACK);
   }
@@ -311,7 +319,7 @@ void displayMenu() {
   img.println(" c");
   img.setCursor(150, fontsize * 6);
   if (editbright) {
-    img.setTextColor(TFT_BLACK, TFT_WHITE);
+    img.setTextColor(TFT_BLACK, selcolor);
   } else {
     img.setTextColor(TFT_WHITE, TFT_BLACK);
   }
@@ -319,21 +327,22 @@ void displayMenu() {
   img.println(" (1-255)");
   img.setCursor(150, fontsize * 7);
   if (editauto) {
-    img.setTextColor(TFT_BLACK, TFT_WHITE);
+    img.setTextColor(TFT_BLACK, selcolor);
   } else {
     img.setTextColor(TFT_WHITE, TFT_BLACK);
   }
-  img.print(autobright);
+  if (autobright) {img.print("ON");}
+  else {img.print("OFF");}
   //img.setCursor(200, fontsize*8);
   //if (wifireset) {img.println("Reset!");}
-  img.setCursor(0, 106);
+  img.setCursor(0, 200);
   img.print("rawVOC: ");
   img.print(srawVoc);
   img.print(" | Raw Temp: ");
   img.print(temperature);
   img.print((char)247);
-  img.print("c");
-  img.setCursor(0, 114);
+  img.println("c");
+  //img.setCursor(0, 216);
   img.print("rawNOX: ");
   img.print(srawNox);
   img.print(" | Hum: ");
@@ -343,17 +352,18 @@ void displayMenu() {
 }
 
 void setupChart(int decimals) {
+  img.setTextFont(chartfont);
   img.setTextSize(1);
   img.setTextColor(TFT_WHITE);
   img.setCursor(0, 0);
   img.print("<");
   img.print(maxVal, decimals);
 
-  img.setCursor(0, 229);  // Adjusted for 240x240 display
+  img.setCursor(0, 240-16);  // Adjusted for 240x240 display
   img.print("<");
   img.print(minVal, decimals);
 
-  img.setCursor(120, 229);  // Adjusted for new width
+  img.setCursor(100, 240-16);  // Adjusted for new width
   img.print("<--");
   img.print(readingCount - 1, 0);
   img.print("*");
@@ -363,7 +373,7 @@ void setupChart(int decimals) {
 }
 
 void doTempChart() {
-  
+  img.setTextFont(chartfont);
   minVal = array1[maxArray - readingCount];
   maxVal = array1[maxArray - readingCount];
 
@@ -395,15 +405,12 @@ void doTempChart() {
     }
   }
   setupChart(2);
-  img.print("[Temp: ");
-  img.print(array1[(maxArray - 1)], 2);
-  img.print((char)247);
-  img.print("c]");
+  img.print("Temp");
   img.pushSprite(0, 0);
 }
 
 void doHumChart() {
-  
+  img.setTextFont(chartfont);
   minVal = array2[maxArray - readingCount];
   maxVal = array2[maxArray - readingCount];
 
@@ -434,14 +441,12 @@ void doHumChart() {
     }
   }
   setupChart(2);
-  img.print("[Hum: ");
-  img.print(array2[(maxArray - 1)], 1);
-  img.print("%]");
+  img.print("Hum");
   img.pushSprite(0, 0);
 }
 
 void doVocChart() {
-  
+  img.setTextFont(chartfont);
   minVal = array3[maxArray - readingCount];
   maxVal = array3[maxArray - readingCount];
 
@@ -473,24 +478,29 @@ void doVocChart() {
     }
   }
   setupChart(0);
-  img.print("[VOC Index: ");
-  img.print(array3[(maxArray - 1)], 0);
-  img.print("]");
+  img.print("VOC Index");
   img.pushSprite(0, 0);
 }
 
 void doNoxChart() {
-
+  img.setTextFont(chartfont);
   minVal = array4[maxArray - readingCount];
   maxVal = array4[maxArray - readingCount];
+  int noxcount;
 
   for (int i = maxArray - readingCount + 1; i < maxArray; i++) {
+    noxcount += array4[i];
     if ((array4[i] < minVal) && (array4[i] > 0)) {
       minVal = array4[i];
     }
     if (array4[i] > maxVal) {
       maxVal = array4[i];
     }
+  }
+
+  if (noxcount < (readingCount + 1)) {
+    minVal = 0;
+    maxVal = 2;
   }
 
   float yScale = 239.0 / (maxVal - minVal);
@@ -510,9 +520,7 @@ void doNoxChart() {
     }
   }
   setupChart(0);
-  img.print("[Raw NOX: ");
-  img.print(array4[(maxArray - 1)], 0);
-  img.print("]");
+  img.print("NOX Index");
   img.pushSprite(0, 0);
 }
 
@@ -647,7 +655,7 @@ void setup() {
   tft.setTextColor(TFT_WHITE, TFT_BLACK);
   tft.setTextDatum(TR_DATUM);
   tft.setTextWrap(true);  // Wrap on width
-  tft.setTextSize(2);
+  tft.setTextFont(4);
   tft.println("Loading VOC Meter...");  
   
   if (wifisaved) {
@@ -798,7 +806,7 @@ void loop() {
         while (!digitalRead(5)) {
           delay(10);
           if ((millis() - buttonTimer) > 2000) {
-            tft.setTextSize(2);
+            tft.setTextFont(4);
             tft.setCursor(0, 0);
             tft.fillScreen(TFT_BLACK);
             analogWrite(bkl_pin, 255);
@@ -843,7 +851,7 @@ void loop() {
             {
               img.fillScreen(TFT_BLACK);
               img.setCursor(0, 0);
-              img.setTextSize(2);
+              img.setTextFont(4);
               img.println("Use your mobile phone to connect to ");
               img.println("[VOC Meter Setup] then browse to");
               img.println("http://192.168.4.1 to connect to WiFi");
@@ -854,7 +862,7 @@ void loop() {
                 wm.startConfigPortal("VOC Meter Setup");
               } else {
                 bool res;
-                tft.setTextSize(2);
+                tft.setTextFont(4);
                 tft.setCursor(0, 0);
                 res = wm.autoConnect("VOC Meter Setup");
                 if (!res) {  //if the wifi manager failed to connect to wifi
@@ -888,7 +896,7 @@ void loop() {
                   tft.println("/update");
                   tft.println("Press button to continue.");
                   while (digitalRead(button5)) { delay(10); }
-                  tft.setTextSize(2);
+                  tft.setTextFont(4);
                   tft.setCursor(0, 0);
                   tft.fillScreen(TFT_BLACK);
                   tft.println("Loading menu...");
@@ -1060,10 +1068,10 @@ void loop() {
   every(sampleMilliSecs) {
 
     takeSamples();
-    Blynk.virtualWrite(V71, srawVoc);
-    Blynk.virtualWrite(V72, srawNox);
-    Blynk.virtualWrite(V73, voc_index);
-    Blynk.virtualWrite(V74, nox_index);
+    Blynk.virtualWrite(V101, srawVoc);
+    Blynk.virtualWrite(V102, srawNox);
+    Blynk.virtualWrite(V103, voc_index);
+    Blynk.virtualWrite(V104, nox_index);
     Blynk.virtualWrite(V75, tempSHT);
     Blynk.virtualWrite(V76, humidity);
   }
